@@ -1,27 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies.db import get_db
-from app.models.part import Part
 from app.services.export_service import generate_excel, generate_pdf
+from app.services.part_service import PartService
+from app.repositories.part_repository import PartRepository
 
 router = APIRouter(prefix="/export", tags=["export"])
 
 
-def get_root_part(db: Session) -> Part:
-    part = db.query(Part).filter(Part.parent_id == None).first()
-
-    if not part:
-        raise HTTPException(status_code=404, detail="Root part not found")
-
-    return part
+def get_tree(db: Session):
+    repo = PartRepository(db)
+    service = PartService(repo)
+    return service.get_tree()
 
 
 @router.get("/excel")
 def export_excel(db: Session = Depends(get_db)):
-    part = get_root_part(db)
-    file = generate_excel(part)
+    tree = get_tree(db)
+    file = generate_excel(tree)
 
     return StreamingResponse(
         file,
@@ -32,8 +30,8 @@ def export_excel(db: Session = Depends(get_db)):
 
 @router.get("/pdf")
 def export_pdf(db: Session = Depends(get_db)):
-    part = get_root_part(db)
-    file = generate_pdf(part)
+    tree = get_tree(db)
+    file = generate_pdf(tree)
 
     return StreamingResponse(
         file,

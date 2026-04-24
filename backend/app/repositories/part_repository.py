@@ -3,7 +3,6 @@ from app.models.part import Part
 
 
 class PartRepository:
-
     def __init__(self, db: Session):
         self.db = db
 
@@ -13,6 +12,9 @@ class PartRepository:
     def get(self, part_id: int):
         return self.db.query(Part).filter(Part.id == part_id).first()
 
+    def get_all(self):
+        return self.db.query(Part).all()
+    
     def create(self, data: dict):
         part = Part(**data)
         self.db.add(part)

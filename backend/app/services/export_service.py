@@ -1,41 +1,42 @@
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
-from app.models.part import Part
+
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
+
 pdfmetrics.registerFont(
     TTFont("DejaVu", "app/fonts/DejaVuSans.ttf")
 )
 
-def calculate_total(part: Part):
-    if part.children:
-        return sum(calculate_total(child) for child in part.children)
-    return (part.price or 0) * (part.quantity or 1)
 
-def build_tree(part: Part, level=0, index=""):
+def build_rows(tree):
     rows = []
 
-    current_index = index or "1"
+    def walk(node, level=0, index=""):
+        current_index = index or "1"
 
-    rows.append({
-        "index": current_index,
-        "name": "    " * level + part.name,
-        "price": part.price or 0,
-        "quantity": part.quantity or 1,
-        "total": calculate_total(part)
-    })
+        rows.append({
+            "index": current_index,
+            "name": "    " * level + node["name"],
+            "price": node["price"] or 0,
+            "quantity": node["quantity"] or 1,
+            "total": node["total_price"]
+        })
 
-    for i, child in enumerate(part.children, 1):
-        child_index = f"{current_index}.{i}"
-        rows.extend(build_tree(child, level + 1, child_index))
+        for i, child in enumerate(node["children"], 1):
+            walk(child, level + 1, f"{current_index}.{i}")
+
+    for i, root in enumerate(tree, 1):
+        walk(root, 0, str(i))
 
     return rows
 
-def generate_excel(part: Part) -> BytesIO:
+
+def generate_excel(tree):
     wb = Workbook()
     ws = wb.active
     ws.title = "Parts"
@@ -57,7 +58,7 @@ def generate_excel(part: Part) -> BytesIO:
         cell.alignment = Alignment(horizontal="center")
         cell.border = border
 
-    rows = build_tree(part)
+    rows = build_rows(tree)
 
     for row in rows:
         ws.append([
@@ -75,11 +76,12 @@ def generate_excel(part: Part) -> BytesIO:
     stream.seek(0)
     return stream
 
-def generate_pdf(part: Part) -> BytesIO:
+
+def generate_pdf(tree):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer)
 
-    rows = build_tree(part)
+    rows = build_rows(tree)
 
     table_data = [["№", "Деталь", "Цена", "Кол-во", "Стоимость"]]
 
