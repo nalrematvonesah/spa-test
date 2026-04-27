@@ -31,25 +31,37 @@ class PartService:
             else:
                 tree.append(part)
 
-        return [self.build_tree(p) for p in tree]
+        for node in tree:
+            self.add_total_price(node)
+
+        return tree
 
     def build_tree(self, part):
         return {
-            "id": part["id"],
-            "name": part["name"],
-            "price": part["price"],
-            "quantity": part["quantity"],
-            "parent_id": part["parent_id"],
+            "id": part.id,
+            "name": part.name,
+            "price": part.price,
+            "quantity": part.quantity,
+            "parent_id": part.parent_id,
             "total_price": self.calculate_price(part),
-            "children": [self.build_tree(child) for child in part["children"]],
+            "children": [self.build_tree(child) for child in part.children],
         }
 
     def calculate_price(self, part):
-        if part["children"]:
-            return sum(self.calculate_price(child) for child in part["children"])
-        return (part["price"] or 0) * (part["quantity"] or 1)
+        if isinstance(part, dict):
+            if part["children"]:
+                return sum(self.calculate_price(child) for child in part["children"])
+            return part["price"] * part["quantity"]
 
-
+        if part.children:
+            return sum(self.calculate_price(child) for child in part.children)
+        return part.price * part.quantity
+    
+    def add_total_price(self, part):
+        part["total_price"] = self.calculate_price(part)
+        for child in part["children"]:
+            self.add_total_price(child)
+    
     def create(self, data):
         self.validate(data)
         return self.repo.create(data)
